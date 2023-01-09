@@ -1,34 +1,34 @@
-from bs4 import BeautifulSoup
-import datetime
-import re
-import getpass
-import openpyxl as xl
-import requests
-from lxml.html import fromstring
-import time
-from selenium.common import exceptions
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-import time
-import random
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
 import colorsys
-import plotly.graph_objects as go
+import datetime
+import getpass
+import random
+import re
+import time
+from datetime import datetime
+from shutil import copyfile
+import os
 
+import numpy as np
+import openpyxl as xl
+import pandas as pd
+import plotly.graph_objects as go
+import requests
+from bs4 import BeautifulSoup
+from lxml.html import fromstring
+from selenium import webdriver
+from selenium.common import exceptions
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
 
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', None)
 
+
 # Replace error expression in string:
 def clarify(text):
-    error_char = [u'\xa0', ',','N/A']
-    replace_char = [u' ', '','NaN']
+    error_char = [u'\xa0', ',', 'N/A']
+    replace_char = [u' ', '', 'NaN']
     '''
         error_char = [u'\xa0', ',', 'N/A', "Q1 ", "Q2 ", "Q3 ", "Q4 "]#'Kết Quả Kinh Doanh'
     replace_char = [u' ', '', '=NA()', "03/30/", "06/30/", "09/30/", "12/30/"]#'Thời gian'
@@ -124,12 +124,6 @@ def close_start_popup(driver):
         None
 
 
-'''
-USE FOR DYNAMIC WEBPAGE AND REQUIRING FOR CLICK NEXT/ PREVIOUS TO DISPLAY CONTINUOUS DATA 
-'''
-
-
-
 def get_page_webdriver(url_):
     options = Options()
     options.headless = True
@@ -141,12 +135,14 @@ def get_page_webdriver(url_):
     driver.quit()
     return soup
 
+
 def rename_files_inside_container(container_path, old_name, new_name):
     import os
     path = container_path
     files = os.listdir(path)
     for index, file in enumerate(files):
-        os.rename(os.path.join(path, file), os.path.join(path,file.replace(old_name, new_name)))
+        os.rename(os.path.join(path, file), os.path.join(path, file.replace(old_name, new_name)))
+
 
 def get_column_header_from_file(_directory, col_no):
     try:
@@ -163,24 +159,25 @@ def get_column_data_from_file(_directory, col_no, _dtype=np.unicode_):
 
 def growth_rate(df_, look_back=4):
     df_ = df_.reindex(index=df_.index[::-1]).pct_change(periods=look_back)
-    df_ = df_.reindex(index=df_.index[::-1])
     return df_
 
 
-def get_df_row_data(_df,_str):
+def get_df_row_data(_df, _str):
     return _df.xs(_str, level=1).iloc[0, :]
 
 
-def trace_data(dict_, x, y):
-    if str(dict_['type']).lower() == 'bar':
-        return go.Bar(x=x, y=y, name=dict_['name'], opacity=0.5, marker=dict_['marker color'])
+def trace_data(layout, name, x, y):
+    color = '{}{}{}'.format('rgb(', layout.loc[name, 'marker_color'], ')')
+    if layout.loc[name, 'type'] == 'bar':
+        return go.Bar(x=x, y=y, name=name, opacity=0.5, marker=marker_control(color))
     else:
-        return go.Scatter(x=x, y=y, mode='lines', name=dict_['name'], marker=dict_['marker color'])
+        return go.Scatter(x=x, y=y, mode='lines', name=name, marker=marker_control(color))
+
 
 def get_derivative_param(df_, dict_):
     if '/' in dict_['look_up_name']:
         sub = dict_['look_up_name'].split("/")
-        plot = get_df_row_data(df_, sub[0])/get_df_row_data(df_, sub[1])
+        plot = get_df_row_data(df_, sub[0]) / get_df_row_data(df_, sub[1])
     elif 'AGR' in dict_['name']:
         plot = get_df_row_data(df_, dict_['look_up_name'])
         if str(df_.columns[0]).startswith('Q'):
@@ -201,23 +198,33 @@ def get_data(ticker_, df_, traces_dict_):
     return temp_
 
 
-
 def lighten_darken_color(color, factor):
     color = color.replace('rgb(', '').replace(')', '').split(',')
     color = [int(col) / 255.0 for col in color]
     color = colorsys.rgb_to_hls(color[0], color[1], color[2])
     color = colorsys.hls_to_rgb(color[0], color[1] * factor, color[2])
     color = [int(col * 255) for col in color]
-    return 'rgb({},{},{})'.format(color[0],color[1],color[2])
+    return 'rgb({},{},{})'.format(color[0], color[1], color[2])
 
+def color_variant(hex_color, brightness_offset=5):
+    """ takes a color like #87c95f and produces a lighter or darker variant """
+    if len(hex_color) != 7:
+        raise Exception("Passed %s into color_variant(), needs to be in #87c95f format." % hex_color)
+    rgb_hex = [hex_color[x:x+2] for x in [1, 3, 5]]
+    new_rgb_int = [int(hex_value, 16) + brightness_offset for hex_value in rgb_hex]
+    new_rgb_int = [min([255, max([0, i])]) for i in new_rgb_int] # make sure new values are between 0 and 255
+    # hex() produces "0x88", we want just "88"
+    return "#" + "".join([hex(i)[2:] for i in new_rgb_int])
 
 def marker_control(color):
     return {'color': color,
-            'line_color': lighten_darken_color(color,0.5)
+            'line_color': lighten_darken_color(color, 0.5)
             }
+
 
 def is_nan(num):
     return num != num
+
 
 def axis_limit(_list, coverage=1):
     # Coverage = 1 mean axis range won't cover the largest and smallest value
@@ -225,9 +232,10 @@ def axis_limit(_list, coverage=1):
     non_nan = [i for i in _list if not is_nan(i)]
     if np.sort(non_nan)[-coverage] > max:
         max = np.sort(non_nan)[-coverage]
-    if np.sort(non_nan)[coverage-1] < min:
-        min = np.sort(non_nan)[coverage-1]
+    if np.sort(non_nan)[coverage - 1] < min:
+        min = np.sort(non_nan)[coverage - 1]
     return min, max
+
 
 def get_page(url_):
     # APPLYING FOR STATIC PAGE
@@ -250,8 +258,6 @@ def get_page(url_):
     return BeautifulSoup(rq.content, 'html.parser', from_encoding=encoding)
 
 
-
-
 '''def get_title(ticker):
     ticker_info = list(pd.read_csv(root.loc['General info', 'Path'], index_col=1).loc[ticker, :])
     dict_ = {}
@@ -264,9 +270,6 @@ def get_page(url_):
     dict_['Khoi luong NY/DKGD'] =ticker_info[7]
     return dict_'''
 
-
-
-
 '''def is_empty_ticker(ticker):
     try:
         return ticker not in root.index or pd.read_csv(root.loc[ticker, 'Path'], index_col=[0, 1, 2]).empty
@@ -274,7 +277,7 @@ def get_page(url_):
         return True'''
 
 
-def shift_to_top(list_,ticker_):
+def shift_to_top(list_, ticker_):
     list_.remove(ticker_)
     list_.insert(0, ticker_)
     return list_
@@ -283,7 +286,8 @@ def shift_to_top(list_,ticker_):
 def timer(func):
     start_time = time.time()
     func()
-    return("--- %s seconds ---" % (time.time() - start_time))
+    return ("--- %s seconds ---" % (time.time() - start_time))
+
 
 '''def fix_lower_case_index_error(ticker_):
     df_ = pd.read_csv(root.loc[ticker_,'Path'],index_col=0)
@@ -298,7 +302,7 @@ def sort_quarterly(li):
     quarterly_re = '([1-4]{1}?)'
 
     natural_sort(li, yearly_re)
-    years = [re.search(yearly_re,key).group() for key in li]
+    years = [re.search(yearly_re, key).group() for key in li]
     years = list(dict.fromkeys(years))
     result = []
     for year in years:
@@ -315,9 +319,9 @@ def sort_yearly(li):
     return li
 
 
-def natural_sort(_list, reg, reverse=True): # Sort list of number-included-string
+def natural_sort(_list, reg, reverse=True):  # Sort list of number-included-string
     convert = lambda text: int(text) if text.isdigit() else text
-    alphanum_key = lambda key: [convert(c) for c in re.search(reg,key).group()]
+    alphanum_key = lambda key: [convert(c) for c in re.search(reg, key).group()]
     _list.sort(key=alphanum_key)
     if reverse:
         _list.reverse()
@@ -330,11 +334,12 @@ def sort_columns(list):
     year = []
     quarter = []
     for i in list:
-        if re.search('^[Qq]',str(i)):
+        if re.search('^[Qq]', str(i)):
             quarter.append(i)
-        elif re.search(yearly_re,str(i)):
+        elif re.search(yearly_re, str(i)):
             year.append(i)
-        else: title.append(i)
+        else:
+            title.append(i)
     year = sort_yearly(year)
     quarter = sort_quarterly(quarter)
     result = []
@@ -353,7 +358,7 @@ def to_float64(df_):
             df_[col] = df_[col].str.replace(',', '').replace('-', 0)
             df_[col] = df_[col].astype('float64')
         except ValueError:
-            print('Unable converting '+ col+ ' column to float64')
+            print('Unable converting ' + col + ' column to float64')
             continue
     return df_
 
@@ -362,13 +367,51 @@ def remove_invalid_columns(df_):
     df_ = df_.loc[:, ~df_.columns.str.replace("(\.\d+)$", "").duplicated()]
     df_ = df_.dropna(how='all', axis=1)
     for col in df_.columns:
-        if col.isdigit() and int(col)<2000:
+        if col.isdigit() and int(col) < 2000:
             print(col)
-            df_ = df_.drop(col, axis =1)
+            df_ = df_.drop(col, axis=1)
     return df_
 
 
-def rename_column(df_):
-    name = [(col, "Y"+str(col)) for col in df_.columns if str(col).isdigit()]
-    df_.rename(columns= dict(name), inplace=True)
+def columns_clarify(df_):
+    df_ = remove_invalid_columns(df_)
+    columns = df_.columns
+    result = ['' for i in range(len(columns))]
+    for i in range(len(columns)):
+        if '-' in str(columns[i]):
+            result[i] = str(columns[i]).replace('-', ' ')
+        elif str(columns[i]).isdigit() and len(columns[i]) == 4:
+            result[i] = "Y" + str(columns[i])
+        elif str(columns[i]).startswith('N'):
+            result[i] = str(columns[i]).replace('N', 'Y')
+        elif str(columns[i]).startswith('Q'):
+            text = str(columns[i])
+            new_text = text[:2] + " " + text[-4:]
+            result[i] = new_text
+        else:
+            print("Unable to rename column: " + str(columns[i]))
+            result[i] = columns[i]
+    df_.columns = result
+
+    df_ = remove_invalid_columns(df_)
     return df_
+
+def backup(_oldpath):
+    _file_name = os.path.splitext(os.path.basename(_oldpath))[0]
+    _now = datetime.now().strftime("%d-%m-%Y @%H%M%S")
+    copyfile(_oldpath, f"D:/Barn/Backup/{_file_name}-backup {_now}.csv")
+
+
+def parse_time(__df):
+    for c in __df.columns:
+        if any(sub in c for sub in ["Date", "Time"]):
+            extracted = __df[c].astype(str).str.extract(r"(\d+)")
+            __df[c] = extracted
+            parsed = __df[c].apply(lambda x: datetime.fromtimestamp(float(x) / 1000).strftime('%Y-%m-%d') if pd.notnull(x) else x)
+            __df[c] = parsed
+    return __df
+
+
+
+
+
